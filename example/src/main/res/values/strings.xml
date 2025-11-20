@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Assembled Chat Example</string>
+    <string name="main_description">Choose an integration method to test the Assembled Chat SDK</string>
+    
+    <string name="activity_example">Activity Example</string>
+    <string name="view_example">View Example</string>
+    <string name="fragment_example">Fragment Example</string>
+    <string name="compose_example">Compose Example</string>
+    
+    <string name="open_chat">Open Chat</string>
+    <string name="close_chat">Close Chat</string>
+</resources>
+

@@ -11,10 +11,14 @@ android {
 
     defaultConfig {
         minSdk = 21
-        targetSdk = 34
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+    }
+    
+    // For library modules, use lint.targetSdk instead of defaultConfig.targetSdk
+    lint {
+        targetSdk = 34
     }
 
     buildTypes {
@@ -96,19 +100,14 @@ val sourcesJar by tasks.registering(Jar::class) {
 }
 
 afterEvaluate {
-    // Ensure proper task dependencies
-    tasks.named("generateMetadataFileForReleasePublication") {
-        dependsOn(sourcesJar)
-    }
-    
     publishing {
         publications {
             create<MavenPublication>("release") {
                 from(components["release"])
                 
                 // Artifacts required by Maven Central
-                artifact(sourcesJar)
-                artifact(javadocJar)
+                artifact(sourcesJar.get())
+                artifact(javadocJar.get())
                 
                 // Publication coordinates
                 groupId = providers.gradleProperty("GROUP").getOrElse("io.github.assembledhq")
@@ -153,6 +152,11 @@ afterEvaluate {
             gradle.taskGraph.allTasks.any { it is PublishToMavenRepository }
         }
         sign(publishing.publications["release"])
+    }
+    
+    // Ensure proper task dependencies after publishing tasks are created
+    tasks.matching { it.name == "generateMetadataFileForReleasePublication" }.configureEach {
+        dependsOn(sourcesJar)
     }
 }
 

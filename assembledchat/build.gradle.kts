@@ -101,7 +101,7 @@ afterEvaluate {
                 from(components["release"])
                 
                 // Artifacts required by Maven Central
-                artifact(sourcesJar)
+                artifact(sourcesJar) { builtBy(sourcesJar) }
                 artifact(javadocJar)
                 
                 // Publication coordinates

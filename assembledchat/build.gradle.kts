@@ -92,13 +92,6 @@ val javadocJar by tasks.registering(Jar::class) {
     from(layout.buildDirectory.dir("javadoc"))
 }
 
-// Task to generate sources JAR (required by Maven Central)
-val sourcesJar by tasks.registering(Jar::class) {
-    archiveClassifier.set("sources")
-    from(android.sourceSets["main"].java.srcDirs)
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
-
 afterEvaluate {
     publishing {
         publications {
@@ -106,7 +99,8 @@ afterEvaluate {
                 from(components["release"])
                 
                 // Artifacts required by Maven Central
-                artifact(sourcesJar.get())
+                // Use Android plugin's built-in sources jar task
+                artifact(tasks.named("releaseSourcesJar"))
                 artifact(javadocJar.get())
                 
                 // Publication coordinates
@@ -156,7 +150,7 @@ afterEvaluate {
     
     // Ensure proper task dependencies after publishing tasks are created
     tasks.matching { it.name == "generateMetadataFileForReleasePublication" }.configureEach {
-        dependsOn(sourcesJar)
+        dependsOn(tasks.named("releaseSourcesJar"))
     }
 }
 

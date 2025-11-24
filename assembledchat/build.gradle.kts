@@ -2,6 +2,7 @@ plugins {
     id("com.android.library")
     id("kotlin-android")
     id("maven-publish")
+    signing
 }
 
 android {
@@ -80,14 +81,33 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+// Task to generate Javadoc JAR (required by Maven Central)
+val javadocJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("javadoc")
+    // Empty javadoc JAR is acceptable for Maven Central
+    from(layout.buildDirectory.dir("javadoc"))
+}
+
+// Task to generate sources JAR (required by Maven Central)
+val sourcesJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("sources")
+    from(android.sourceSets["main"].java.srcDirs)
+}
+
 afterEvaluate {
     publishing {
         publications {
             create<MavenPublication>("release") {
                 from(components["release"])
-                groupId = "com.assembled"
+                
+                // Artifacts required by Maven Central
+                artifact(sourcesJar)
+                artifact(javadocJar)
+                
+                // Publication coordinates
+                groupId = providers.gradleProperty("GROUP").getOrElse("io.github.assembledhq")
                 artifactId = "assembledchat"
-                version = "1.0.0"
+                version = providers.gradleProperty("VERSION_NAME").getOrElse("1.0.0")
 
                 pom {
                     name.set("Assembled Chat Android SDK")
@@ -105,6 +125,8 @@ afterEvaluate {
                         developer {
                             id.set("assembled")
                             name.set("Assembled")
+                            organization.set("Assembled")
+                            organizationUrl.set("https://www.assembled.com")
                         }
                     }
                     
@@ -116,6 +138,15 @@ afterEvaluate {
                 }
             }
         }
+    }
+    
+    // Signing configuration (required by Maven Central)
+    signing {
+        // Only sign if we have the signing credentials
+        setRequired {
+            gradle.taskGraph.allTasks.any { it is PublishToMavenRepository }
+        }
+        sign(publishing.publications["release"])
     }
 }
 

@@ -78,3 +78,8 @@ lint/tmp/
 *~
 .DS_Store
 
+# GPG signing keys (NEVER commit these!)
+*.gpg
+*.gpg.b64
+secring.*
+

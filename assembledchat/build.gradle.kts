@@ -1,8 +1,9 @@
+import com.vanniktech.maven.publish.SonatypeHost
+
 plugins {
     id("com.android.library")
     id("kotlin-android")
-    id("maven-publish")
-    signing
+    id("com.vanniktech.maven.publish") version "0.30.0"
 }
 
 android {
@@ -85,72 +86,48 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-// Task to generate Javadoc JAR (required by Maven Central)
-val javadocJar by tasks.registering(Jar::class) {
-    archiveClassifier.set("javadoc")
-    // Empty javadoc JAR is acceptable for Maven Central
-    from(layout.buildDirectory.dir("javadoc"))
-}
-
-afterEvaluate {
-    publishing {
-        publications {
-            create<MavenPublication>("release") {
-                from(components["release"])
-                
-                // Artifacts required by Maven Central
-                // Use Android plugin's built-in sources jar task
-                artifact(tasks.named("releaseSourcesJar"))
-                artifact(javadocJar.get())
-                
-                // Publication coordinates
-                groupId = providers.gradleProperty("GROUP").getOrElse("io.github.assembledhq")
-                artifactId = "assembledchat"
-                version = providers.gradleProperty("VERSION_NAME").getOrElse("1.0.0")
-
-                pom {
-                    name.set("Assembled Chat Android SDK")
-                    description.set("Android SDK for integrating Assembled Chat into your application")
-                    url.set("https://github.com/assembledhq/assembled-chat-android-sdk")
-                    
-                    licenses {
-                        license {
-                            name.set("MIT License")
-                            url.set("https://opensource.org/licenses/MIT")
-                        }
-                    }
-                    
-                    developers {
-                        developer {
-                            id.set("assembled")
-                            name.set("Assembled")
-                            organization.set("Assembled")
-                            organizationUrl.set("https://www.assembled.com")
-                        }
-                    }
-                    
-                    scm {
-                        connection.set("scm:git:git://github.com/assembledhq/assembled-chat-android-sdk.git")
-                        developerConnection.set("scm:git:ssh://git@github.com/assembledhq/assembled-chat-android-sdk.git")
-                        url.set("https://github.com/assembledhq/assembled-chat-android-sdk")
-                    }
-                }
+// Configure Maven publishing with Vanniktech plugin for Central Portal
+mavenPublishing {
+    // Publication coordinates
+    coordinates(
+        groupId = "io.github.assembledhq",
+        artifactId = "assembledchat",
+        version = "1.0.0"
+    )
+    
+    // POM configuration
+    pom {
+        name.set("Assembled Chat Android SDK")
+        description.set("Android SDK for integrating Assembled Chat into your application")
+        url.set("https://github.com/assembledhq/assembled-chat-android-sdk")
+        
+        licenses {
+            license {
+                name.set("MIT License")
+                url.set("https://opensource.org/licenses/MIT")
             }
         }
-    }
-    
-    // Signing configuration (required by Maven Central)
-    signing {
-        // Only sign if we have the signing credentials
-        setRequired {
-            gradle.taskGraph.allTasks.any { it is PublishToMavenRepository }
+        
+        developers {
+            developer {
+                id.set("assembled")
+                name.set("Assembled")
+                organization.set("Assembled")
+                organizationUrl.set("https://www.assembled.com")
+            }
         }
-        sign(publishing.publications["release"])
+        
+        scm {
+            connection.set("scm:git:git://github.com/assembledhq/assembled-chat-android-sdk.git")
+            developerConnection.set("scm:git:ssh://git@github.com/assembledhq/assembled-chat-android-sdk.git")
+            url.set("https://github.com/assembledhq/assembled-chat-android-sdk")
+        }
     }
     
-    // Ensure proper task dependencies after publishing tasks are created
-    tasks.matching { it.name == "generateMetadataFileForReleasePublication" }.configureEach {
-        dependsOn(tasks.named("releaseSourcesJar"))
-    }
+    // Publish to Central Portal (new system)
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL, automaticRelease = true)
+    
+    // Configure signing
+    signAllPublications()
 }
 

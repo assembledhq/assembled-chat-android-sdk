@@ -21,8 +21,25 @@ nexusPublishing {
             nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
             snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
             
-            username.set(providers.gradleProperty("ossrhUsername").getOrElse(""))
-            password.set(providers.gradleProperty("ossrhPassword").getOrElse(""))
+            // Try to get credentials from local.properties first, then gradle.properties, then environment variables
+            val localProperties = java.util.Properties()
+            val localPropertiesFile = rootProject.file("local.properties")
+            if (localPropertiesFile.exists()) {
+                localPropertiesFile.inputStream().use { localProperties.load(it) }
+            }
+            
+            username.set(
+                localProperties.getProperty("ossrhUsername")
+                    ?: providers.gradleProperty("ossrhUsername").getOrElse(
+                        providers.environmentVariable("OSSRH_USERNAME").getOrElse("")
+                    )
+            )
+            password.set(
+                localProperties.getProperty("ossrhPassword")
+                    ?: providers.gradleProperty("ossrhPassword").getOrElse(
+                        providers.environmentVariable("OSSRH_PASSWORD").getOrElse("")
+                    )
+            )
         }
     }
 }

@@ -92,16 +92,22 @@ val javadocJar by tasks.registering(Jar::class) {
 val sourcesJar by tasks.registering(Jar::class) {
     archiveClassifier.set("sources")
     from(android.sourceSets["main"].java.srcDirs)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 afterEvaluate {
+    // Ensure proper task dependencies
+    tasks.named("generateMetadataFileForReleasePublication") {
+        dependsOn(sourcesJar)
+    }
+    
     publishing {
         publications {
             create<MavenPublication>("release") {
                 from(components["release"])
                 
                 // Artifacts required by Maven Central
-                artifact(sourcesJar) { builtBy(sourcesJar) }
+                artifact(sourcesJar)
                 artifact(javadocJar)
                 
                 // Publication coordinates

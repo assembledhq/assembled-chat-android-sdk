@@ -24,9 +24,7 @@ internal class MessageBridge(
      */
     @JavascriptInterface
     fun onReady() {
-        if (debug) {
-            Log.d(TAG, "Bridge: onReady called from JavaScript")
-        }
+        logDebug("Bridge: onReady called from JavaScript")
         listener?.onChatReady()
     }
 
@@ -35,9 +33,7 @@ internal class MessageBridge(
      */
     @JavascriptInterface
     fun onOpen() {
-        if (debug) {
-            Log.d(TAG, "Bridge: onOpen called from JavaScript")
-        }
+        logDebug("Bridge: onOpen called from JavaScript")
         listener?.onChatOpened()
     }
 
@@ -46,9 +42,7 @@ internal class MessageBridge(
      */
     @JavascriptInterface
     fun onClose() {
-        if (debug) {
-            Log.d(TAG, "Bridge: onClose called from JavaScript")
-        }
+        logDebug("Bridge: onClose called from JavaScript")
         listener?.onChatClosed()
     }
 
@@ -59,9 +53,7 @@ internal class MessageBridge(
      */
     @JavascriptInterface
     fun onError(message: String) {
-        if (debug) {
-            Log.e(TAG, "Bridge: onError - $message")
-        }
+        logError("Bridge: onError - $message")
         listener?.onError(ChatError.BridgeError(message))
     }
 
@@ -72,9 +64,7 @@ internal class MessageBridge(
      */
     @JavascriptInterface
     fun onDebug(message: String) {
-        if (debug) {
-            Log.d(TAG, "Bridge: $message")
-        }
+        logDebug("Bridge: $message")
         listener?.onDebug(message)
     }
 
@@ -85,9 +75,7 @@ internal class MessageBridge(
      */
     @JavascriptInterface
     fun onNewMessage(count: Int) {
-        if (debug) {
-            Log.d(TAG, "Bridge: onNewMessage - count: $count")
-        }
+        logDebug("Bridge: onNewMessage - count: $count")
         listener?.onNewMessage(count)
     }
 
@@ -99,9 +87,7 @@ internal class MessageBridge(
      */
     @JavascriptInterface
     fun postMessage(type: String, data: String) {
-        if (debug) {
-            Log.d(TAG, "Bridge: postMessage - type: $type, data: $data")
-        }
+        logDebug("Bridge: postMessage - type: $type, data: $data")
         
         when (type) {
             "ready" -> onReady()
@@ -110,10 +96,35 @@ internal class MessageBridge(
             "error" -> onError(data)
             "debug" -> onDebug(data)
             else -> {
-                if (debug) {
-                    Log.w(TAG, "Bridge: Unknown message type: $type")
-                }
+                logWarning("Bridge: Unknown message type: $type")
             }
+        }
+    }
+
+    private fun logDebug(message: String) {
+        if (!debug) return
+        try {
+            Log.d(TAG, message)
+        } catch (_: Throwable) {
+            // Ignore logging failures in local unit tests
+        }
+    }
+
+    private fun logError(message: String) {
+        if (!debug) return
+        try {
+            Log.e(TAG, message)
+        } catch (_: Throwable) {
+            // Ignore logging failures in local unit tests
+        }
+    }
+
+    private fun logWarning(message: String) {
+        if (!debug) return
+        try {
+            Log.w(TAG, message)
+        } catch (_: Throwable) {
+            // Ignore logging failures in local unit tests
         }
     }
 }

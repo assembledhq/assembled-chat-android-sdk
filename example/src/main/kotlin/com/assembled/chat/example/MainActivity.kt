@@ -3,9 +3,7 @@ package com.assembled.chat.example
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.assembled.chat.models.AssembledChatConfiguration
 import com.assembled.chat.ui.AssembledChatActivity
 
 class MainActivity : AppCompatActivity() {
@@ -36,8 +34,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun launchActivityExample() {
-        val configuration = createSampleConfiguration()
-        val intent = AssembledChatActivity.createIntent(this, configuration)
+        val configuration = SampleData.configuration()
+        val intent = AssembledChatActivity.createIntent(
+            context = this,
+            companyId = configuration.companyId,
+            profileId = configuration.profileId,
+            activated = configuration.activated,
+            disableLauncher = configuration.disableLauncher,
+            buttonColor = configuration.buttonColor,
+            debug = configuration.debug,
+            jwtToken = configuration.jwtToken,
+            userId = configuration.userData?.userId,
+            userEmail = configuration.userData?.email,
+            userName = configuration.userData?.name
+        )
         startActivity(intent)
     }
 
@@ -54,21 +64,5 @@ class MainActivity : AppCompatActivity() {
     private fun launchComposeExample() {
         val intent = Intent(this, ComposeExampleActivity::class.java)
         startActivity(intent)
-    }
-
-    private fun createSampleConfiguration(): AssembledChatConfiguration {
-        // Replace with your actual company ID
-        return AssembledChatConfiguration(
-            companyId = "your-company-id",
-            brandColor = "#4F46E5",
-            userId = "test-user-${System.currentTimeMillis()}",
-            userName = "Test User",
-            userEmail = "test@example.com",
-            debugMode = true
-        )
-    }
-
-    private fun showToast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 }

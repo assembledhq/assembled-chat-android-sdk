@@ -2,6 +2,7 @@ package com.assembled.chat
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import android.view.View
 import android.webkit.ConsoleMessage
@@ -109,11 +110,25 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                 ) {
                     super.onReceivedError(view, request, error)
                     if (request?.isForMainFrame == true) {
-                        val errorMessage = "Failed to load chat: ${error?.description}"
+                        val description = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            error?.description?.toString()
+                        } else {
+                            error?.toString()
+                        }
+                        val errorMessage = buildString {
+                            append("Failed to load chat")
+                            if (!description.isNullOrBlank()) {
+                                append(": ")
+                                append(description)
+                            }
+                        }
+                        val errorCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            error?.errorCode
+                        } else null
                         if (configuration.debug) {
                             Log.e(TAG, errorMessage)
                         }
-                        listener?.onError(ChatError.LoadError(errorMessage, error?.errorCode))
+                        listener?.onError(ChatError.LoadError(errorMessage, errorCode))
                     }
                 }
             }

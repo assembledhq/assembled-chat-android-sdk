@@ -33,7 +33,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
 
     companion object {
         private const val TAG = "AssembledChat"
-        private const val CHAT_BASE_URL = "https://app.assembledhq.com"
+        private const val CHAT_SCRIPT_URL = "https://cal.assembledhq.com/static/js/public-chat.js"
         private const val BRIDGE_NAME = "AssembledChatAndroid"
     }
 
@@ -95,10 +95,24 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
 
             // Setup WebView client
             webView?.webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                    if (configuration.debug) {
+                        Log.d(TAG, "URL Loading: ${request?.url}")
+                    }
+                    return false
+                }
+
+                override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                    super.onPageStarted(view, url, favicon)
+                    if (configuration.debug) {
+                        Log.d(TAG, "Page started loading: $url")
+                    }
+                }
+
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     if (configuration.debug) {
-                        Log.d(TAG, "Page loaded: $url")
+                        Log.d(TAG, "Page finished loading: $url")
                     }
                     injectConfiguration()
                 }
@@ -148,12 +162,18 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                 }
             }
 
-            // Load chat URL
-            val chatUrl = buildChatUrl()
+            // Load HTML page with embedded chat widget script
+            val chatHtml = buildChatHtml()
             if (configuration.debug) {
-                Log.d(TAG, "Loading chat URL: $chatUrl")
+                Log.d(TAG, "Loading chat widget HTML")
             }
-            webView?.loadUrl(chatUrl)
+            webView?.loadDataWithBaseURL(
+                "https://cal.assembledhq.com",
+                chatHtml,
+                "text/html",
+                "UTF-8",
+                null
+            )
 
             isInitialized = true
             isInitializing = false
@@ -178,7 +198,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
         }
 
         webView?.visibility = View.VISIBLE
-        executeJavaScript("window.AssembledChat?.open()")
+        executeJavaScript("window.assembled?.open()")
 
         if (configuration.debug) {
             Log.d(TAG, "Chat opened")
@@ -195,7 +215,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
         }
 
         webView?.visibility = View.GONE
-        executeJavaScript("window.AssembledChat?.close()")
+        executeJavaScript("window.assembled?.close()")
 
         if (configuration.debug) {
             Log.d(TAG, "Chat closed")
@@ -214,7 +234,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
         }
 
         val userDataJs = userData.toJavaScript()
-        executeJavaScript("window.AssembledChat?.updateUserData($userDataJs)")
+        executeJavaScript("window.assembled?.setUserData($userDataJs)")
 
         if (configuration.debug) {
             Log.d(TAG, "User data updated")
@@ -232,7 +252,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
             return
         }
 
-        executeJavaScript("window.AssembledChat?.updateToken('$token')")
+        executeJavaScript("window.assembled?.setToken('$token')")
 
         if (configuration.debug) {
             Log.d(TAG, "Token updated")
@@ -273,47 +293,126 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
         isInitializing = false
     }
 
-    private fun buildChatUrl(): String {
-        val urlBuilder = StringBuilder("$CHAT_BASE_URL/public_chat?company_id=${configuration.companyId}")
-        configuration.profileId?.let { 
-            urlBuilder.append("&profile_id=$it")
-        }
-        return urlBuilder.toString()
+    private fun buildChatHtml(): String {
+        val userDataJs = configuration.userData?.toJavaScript() ?: "null"
+        val jwtTokenJs = configuration.jwtToken?.let { "'${it.replace("'", "\\'")}'" } ?: "null"
+        val profileIdAttr = configuration.profileId?.let { "data-profile-id=\"$it\"" } ?: ""
+        
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    html, body { 
+                        width: 100%; 
+                        height: 100%; 
+                        overflow: hidden;
+                        background: transparent;
+                    }
+                </style>
+            </head>
+            <body>
+                <script
+                    src="$CHAT_SCRIPT_URL"
+                    data-company-id="${configuration.companyId}"
+                    $profileIdAttr
+                ></script>
+                <script>
+                    (function() {
+                        var maxAttempts = 50;
+                        var attemptInterval = 200;
+                        var attempts = 0;
+                        
+                        function setupBridge() {
+                            attempts++;
+                            
+                            if (typeof window.assembled !== 'undefined') {
+                                console.log('Assembled chat SDK found after ' + attempts + ' attempt(s)');
+                                
+                                // Set user data if provided
+                                var userData = $userDataJs;
+                                if (userData) {
+                                    window.assembled.setUserData(userData);
+                                    console.log('User data set');
+                                }
+                                
+                                // Set JWT token if provided
+                                var jwtToken = $jwtTokenJs;
+                                if (jwtToken) {
+                                    window.assembled.setToken(jwtToken);
+                                    console.log('JWT token set');
+                                }
+                                
+                                // Setup bridge callbacks
+                                if (window.$BRIDGE_NAME) {
+                                    console.log('Setting up Android bridge callbacks');
+                                    
+                                    // Notify ready
+                                    window.$BRIDGE_NAME.onReady();
+                                    
+                                    // Listen for events if the SDK supports them
+                                    if (typeof window.assembled.on === 'function') {
+                                        window.assembled.on('open', function() {
+                                            console.log('Chat opened event');
+                                            window.$BRIDGE_NAME.onOpen();
+                                        });
+                                        window.assembled.on('close', function() {
+                                            console.log('Chat closed event');
+                                            window.$BRIDGE_NAME.onClose();
+                                        });
+                                        window.assembled.on('error', function(error) {
+                                            console.log('Chat error event:', error);
+                                            window.$BRIDGE_NAME.onError(JSON.stringify(error));
+                                        });
+                                        window.assembled.on('message', function(data) {
+                                            console.log('New message event');
+                                            window.$BRIDGE_NAME.onNewMessage(1);
+                                        });
+                                    }
+                                }
+                            } else if (attempts < maxAttempts) {
+                                console.log('Waiting for assembled SDK... attempt ' + attempts + '/' + maxAttempts);
+                                setTimeout(setupBridge, attemptInterval);
+                            } else {
+                                console.error('Assembled chat SDK not found after ' + maxAttempts + ' attempts');
+                                if (window.$BRIDGE_NAME) {
+                                    window.$BRIDGE_NAME.onError('Assembled chat SDK not found - timeout');
+                                }
+                            }
+                        }
+                        
+                        // Start checking after a brief delay to let the script load
+                        setTimeout(setupBridge, 100);
+                    })();
+                </script>
+            </body>
+            </html>
+        """.trimIndent()
     }
 
     private fun injectConfiguration() {
-        val configJs = configuration.toJavaScript()
-        val script = """
-            (function() {
-                if (typeof window.AssembledChat !== 'undefined') {
-                    window.AssembledChat.init($configJs);
-                    
-                    // Setup bridge callbacks
-                    if (window.$BRIDGE_NAME) {
-                        window.AssembledChat.on('ready', function() {
-                            window.$BRIDGE_NAME.onReady();
-                        });
-                        window.AssembledChat.on('open', function() {
-                            window.$BRIDGE_NAME.onOpen();
-                        });
-                        window.AssembledChat.on('close', function() {
-                            window.$BRIDGE_NAME.onClose();
-                        });
-                        window.AssembledChat.on('error', function(error) {
-                            window.$BRIDGE_NAME.onError(JSON.stringify(error));
-                        });
-                    }
-                } else {
-                    console.error('AssembledChat not found on window');
-                    window.$BRIDGE_NAME?.onError('AssembledChat not found');
-                }
-            })();
-        """.trimIndent()
-
-        executeJavaScript(script)
-
+        // Configuration is already injected via the HTML page
+        // This method is called on page load and can be used for additional setup if needed
         if (configuration.debug) {
-            Log.d(TAG, "Configuration injected")
+            val debugScript = """
+                (function() {
+                    var debugInfo = {
+                        hasAssembled: typeof window.assembled !== 'undefined',
+                        windowKeys: Object.keys(window).filter(function(k) { 
+                            return k.toLowerCase().includes('assembled'); 
+                        }),
+                        currentUrl: window.location.href,
+                        readyState: document.readyState
+                    };
+                    console.log('Debug Info:', JSON.stringify(debugInfo));
+                    window.$BRIDGE_NAME?.onDebug('Window check: ' + JSON.stringify(debugInfo));
+                })();
+            """.trimIndent()
+            executeJavaScript(debugScript)
+            Log.d(TAG, "Configuration check executed")
         }
     }
 

@@ -274,8 +274,11 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
     }
 
     private fun buildChatUrl(): String {
-        val profilePath = configuration.profileId?.let { "/profile/$it" } ?: ""
-        return "$CHAT_BASE_URL/public_chat/${configuration.companyId}$profilePath"
+        val urlBuilder = StringBuilder("$CHAT_BASE_URL/public_chat?company_id=${configuration.companyId}")
+        configuration.profileId?.let { 
+            urlBuilder.append("&profile_id=$it")
+        }
+        return urlBuilder.toString()
     }
 
     private fun injectConfiguration() {

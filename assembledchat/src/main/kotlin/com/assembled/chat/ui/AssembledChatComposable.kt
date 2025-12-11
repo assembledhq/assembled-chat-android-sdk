@@ -147,11 +147,11 @@ fun AssembledChatComposable(
     val chat = remember(configuration) {
         AssembledChat(configuration).apply {
             this.listener = listener
+            initialize(context)
         }
     }
 
     DisposableEffect(chat) {
-        chat.initialize(context)
         chat.open()
 
         onDispose {
@@ -167,15 +167,6 @@ fun AssembledChatComposable(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
-            }
-        },
-        update = { webView ->
-            // Update WebView if needed
-            if (webView != chat.getWebView()) {
-                (webView.parent as? ViewGroup)?.removeView(webView)
-                chat.getWebView()?.let { chatWebView ->
-                    (chatWebView.parent as? ViewGroup)?.removeView(chatWebView)
-                }
             }
         }
     )

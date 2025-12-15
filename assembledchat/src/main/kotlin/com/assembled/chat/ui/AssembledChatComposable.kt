@@ -1,5 +1,8 @@
 package com.assembled.chat.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.WebView
@@ -14,6 +17,19 @@ import com.assembled.chat.AssembledChatListener
 import com.assembled.chat.models.AssembledChatConfiguration
 import com.assembled.chat.models.ChatError
 import com.assembled.chat.models.UserData
+
+/**
+ * Helper function to find the Activity context from a given context.
+ * WebView requires an Activity context to access WindowManager and other visual services.
+ */
+private fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
+}
 
 /**
  * Jetpack Compose composable for Assembled Chat.
@@ -109,6 +125,11 @@ fun AssembledChatComposable(
     onNewMessage: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
+    
+    // Find the Activity context to ensure WebView has access to WindowManager
+    val activityContext = remember(context) {
+        context.findActivity() ?: context
+    }
 
     val listener = remember(onReady, onOpened, onClosed, onError, onDebug, onNewMessage) {
         object : AssembledChatListener {
@@ -144,10 +165,10 @@ fun AssembledChatComposable(
         }
     }
 
-    val chat = remember(configuration) {
+    val chat = remember(configuration, activityContext) {
         AssembledChat(configuration).apply {
             this.listener = listener
-            initialize(context)
+            initialize(activityContext)
         }
     }
 
@@ -162,7 +183,7 @@ fun AssembledChatComposable(
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            chat.getWebView() ?: WebView(ctx).apply {
+            chat.getWebView() ?: WebView(activityContext).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT

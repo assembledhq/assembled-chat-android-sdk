@@ -71,8 +71,10 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                 Log.d(TAG, "Initializing Assembled Chat with company ID: ${configuration.companyId}")
             }
 
-            // Create WebView
-            webView = WebView(context.applicationContext).apply {
+            // Create WebView with the provided context
+            // Note: Using context directly instead of applicationContext to support visual services
+            // like WindowManager which are required by WebView
+            webView = WebView(context).apply {
                 layoutParams = android.view.ViewGroup.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT

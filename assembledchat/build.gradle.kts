@@ -92,7 +92,7 @@ mavenPublishing {
     coordinates(
         groupId = "io.github.assembledhq",
         artifactId = "assembledchat",
-        version = "1.0.1"
+        version = "1.0.3"
     )
     
     // POM configuration

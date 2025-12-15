@@ -12,16 +12,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import java.util.concurrent.atomic.AtomicReference
 import com.assembled.chat.AssembledChat
 import com.assembled.chat.AssembledChatListener
 import com.assembled.chat.models.AssembledChatConfiguration
 import com.assembled.chat.models.ChatError
 import com.assembled.chat.models.UserData
 
-/**
- * Helper function to find the Activity context from a given context.
- * WebView requires an Activity context to access WindowManager and other visual services.
- */
 private fun Context.findActivity(): Activity? {
     var context = this
     while (context is ContextWrapper) {
@@ -131,11 +128,19 @@ fun AssembledChatComposable(
         context.findActivity() ?: context
     }
 
-    val listener = remember(onReady, onOpened, onClosed, onError, onDebug, onNewMessage) {
+    val chatInstanceRef = remember { AtomicReference<AssembledChat?>(null) }
+    val disableLauncher = configuration.disableLauncher
+
+    val listener = remember(onReady, onOpened, onClosed, onError, onDebug, onNewMessage, disableLauncher) {
         object : AssembledChatListener {
             override fun onChatReady() {
                 Log.d("AssembledChat", "Chat ready")
                 onReady()
+                
+                // Auto-open chat when disableLauncher is true
+                if (disableLauncher) {
+                    chatInstanceRef.get()?.open()
+                }
             }
 
             override fun onChatOpened() {
@@ -168,15 +173,21 @@ fun AssembledChatComposable(
     val chat = remember(configuration, activityContext) {
         AssembledChat(configuration).apply {
             this.listener = listener
+            chatInstanceRef.set(this)
             initialize(activityContext)
         }
     }
 
     DisposableEffect(chat) {
-        chat.open()
+        // Only auto-open if disableLauncher is false (normal launcher behavior)
+        // If disableLauncher is true, chat will open automatically in onChatReady callback
+        if (!disableLauncher) {
+            chat.open()
+        }
 
         onDispose {
             chat.destroy()
+            chatInstanceRef.set(null)
         }
     }
 

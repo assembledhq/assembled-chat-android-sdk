@@ -71,9 +71,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                 Log.d(TAG, "Initializing Assembled Chat with company ID: ${configuration.companyId}")
             }
 
-            // Create WebView with the provided context
-            // Note: Using context directly instead of applicationContext to support visual services
-            // like WindowManager which are required by WebView
+            // Create WebView (use context directly for WindowManager access)
             webView = WebView(context).apply {
                 layoutParams = android.view.ViewGroup.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
@@ -299,6 +297,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
         val userDataJs = configuration.userData?.toJavaScript() ?: "null"
         val jwtTokenJs = configuration.jwtToken?.let { "'${it.replace("'", "\\'")}'" } ?: "null"
         val profileIdAttr = configuration.profileId?.let { "data-profile-id=\"$it\"" } ?: ""
+        val disableLauncherAttr = if (configuration.disableLauncher) "data-disable-launcher=\"true\"" else ""
         
         return """
             <!DOCTYPE html>
@@ -321,18 +320,26 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                     src="$CHAT_SCRIPT_URL"
                     data-company-id="${configuration.companyId}"
                     $profileIdAttr
+                    $disableLauncherAttr
                 ></script>
                 <script>
                     (function() {
                         var maxAttempts = 50;
                         var attemptInterval = 200;
                         var attempts = 0;
+                        var disableLauncher = ${configuration.disableLauncher};
                         
                         function setupBridge() {
                             attempts++;
                             
                             if (typeof window.assembled !== 'undefined') {
                                 console.log('Assembled chat SDK found after ' + attempts + ' attempt(s)');
+                                
+                                // Configure disableLauncher if needed
+                                if (disableLauncher && typeof window.assembled.setConfig === 'function') {
+                                    window.assembled.setConfig({ disableLauncher: true });
+                                    console.log('disableLauncher configured');
+                                }
                                 
                                 // Set user data if provided
                                 var userData = $userDataJs;

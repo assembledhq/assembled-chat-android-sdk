@@ -243,6 +243,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
 
     /**
      * Update JWT token for authenticated sessions.
+     * Uses the Assembled SDK's authenticateUser method.
      *
      * @param token New JWT token
      */
@@ -252,10 +253,10 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
             return
         }
 
-        executeJavaScript("window.assembled?.setToken('$token')")
+        executeJavaScript("window.assembled?.authenticateUser('$token')")
 
         if (configuration.debug) {
-            Log.d(TAG, "Token updated")
+            Log.d(TAG, "Token updated via authenticateUser")
         }
     }
 
@@ -348,11 +349,11 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                                     console.log('User data set');
                                 }
                                 
-                                // Set JWT token if provided
+                                // Authenticate user with JWT token if provided
                                 var jwtToken = $jwtTokenJs;
                                 if (jwtToken) {
-                                    window.assembled.setToken(jwtToken);
-                                    console.log('JWT token set');
+                                    window.assembled.authenticateUser(jwtToken);
+                                    console.log('JWT token set via authenticateUser');
                                 }
                                 
                                 // Setup bridge callbacks

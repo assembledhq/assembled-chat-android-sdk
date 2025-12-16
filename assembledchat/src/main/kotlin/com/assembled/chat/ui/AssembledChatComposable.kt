@@ -3,6 +3,8 @@ package com.assembled.chat.ui
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.WebView
@@ -130,6 +132,7 @@ fun AssembledChatComposable(
 
     val chatInstanceRef = remember { AtomicReference<AssembledChat?>(null) }
     val disableLauncher = configuration.disableLauncher
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     val listener = remember(onReady, onOpened, onClosed, onError, onDebug, onNewMessage, disableLauncher) {
         object : AssembledChatListener {
@@ -138,8 +141,11 @@ fun AssembledChatComposable(
                 onReady()
                 
                 // Auto-open chat when disableLauncher is true
+                // Must post to main thread since this callback runs on JavaBridge thread
                 if (disableLauncher) {
-                    chatInstanceRef.get()?.open()
+                    mainHandler.post {
+                        chatInstanceRef.get()?.open()
+                    }
                 }
             }
 

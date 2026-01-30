@@ -245,12 +245,12 @@ The SDK is fully compatible with code obfuscation. Consumer ProGuard rules are a
 
 ### Publishing to Maven Central
 
-Releases are automated via GitHub Actions. See [docs/RUNBOOK.md](docs/RUNBOOK.md) for the full process.
+Releases are automated via GitHub Actions.
 
 **Quick release steps:**
 1. Update `VERSION_NAME` in `gradle.properties` (e.g., `1.0.7`)
 2. Commit and push to `master`
-3. Create a GitHub Release with tag `v1.0.7` (matching the version)
+3. Push a git tag matching the version (e.g., `v1.0.7`)
 4. CI automatically publishes to Maven Central
 
 ## License

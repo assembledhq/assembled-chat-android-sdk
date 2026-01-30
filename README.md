@@ -21,7 +21,7 @@ Add the dependency to your app's `build.gradle.kts` or `build.gradle` file:
 
 ```kotlin
 dependencies {
-    implementation("io.github.assembledhq:assembledchat:1.0.0")
+    implementation("io.github.assembledhq:assembledchat:1.0.6")
 }
 ```
 
@@ -29,7 +29,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'io.github.assembledhq:assembledchat:1.0.0'
+    implementation 'io.github.assembledhq:assembledchat:1.0.6'
 }
 ```
 
@@ -245,12 +245,13 @@ The SDK is fully compatible with code obfuscation. Consumer ProGuard rules are a
 
 ### Publishing to Maven Central
 
-The publishing process is manual by default.
+Releases are automated via GitHub Actions.
 
-Quick publish command:
-```bash
-./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository
-```
+**Quick release steps:**
+1. Update `VERSION_NAME` in `gradle.properties` (e.g., `1.0.7`)
+2. Commit and push to `master`
+3. Push a git tag matching the version (e.g., `v1.0.7`)
+4. CI automatically publishes to Maven Central
 
 ## License
 

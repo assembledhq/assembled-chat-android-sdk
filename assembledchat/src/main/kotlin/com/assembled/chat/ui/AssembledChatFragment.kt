@@ -80,6 +80,7 @@ class AssembledChatFragment : Fragment(), AssembledChatListener {
 
     private var chat: AssembledChat? = null
     private var disableLauncher = false
+    private var debug = false
     private val mainHandler = Handler(Looper.getMainLooper())
     var chatListener: AssembledChatListener? = null
 
@@ -101,6 +102,7 @@ class AssembledChatFragment : Fragment(), AssembledChatListener {
 
         val configuration = parseConfiguration()
         disableLauncher = configuration.disableLauncher
+        debug = configuration.debug
 
         chat = AssembledChat(configuration)
         chat?.listener = this
@@ -146,7 +148,7 @@ class AssembledChatFragment : Fragment(), AssembledChatListener {
 
     // AssembledChatListener implementation
     override fun onChatReady() {
-        Log.d(TAG, "Chat ready")
+        if (debug) Log.d(TAG, "Chat ready")
         chatListener?.onChatReady()
 
         // Auto-open chat when disableLauncher is true
@@ -159,27 +161,27 @@ class AssembledChatFragment : Fragment(), AssembledChatListener {
     }
 
     override fun onChatOpened() {
-        Log.d(TAG, "Chat opened")
+        if (debug) Log.d(TAG, "Chat opened")
         chatListener?.onChatOpened()
     }
 
     override fun onChatClosed() {
-        Log.d(TAG, "Chat closed")
+        if (debug) Log.d(TAG, "Chat closed")
         chatListener?.onChatClosed()
     }
 
     override fun onError(error: ChatError) {
-        Log.e(TAG, "Chat error: $error")
+        if (debug) Log.e(TAG, "Chat error: $error")
         chatListener?.onError(error)
     }
 
     override fun onDebug(message: String) {
-        Log.d(TAG, "Debug: $message")
+        if (debug) Log.d(TAG, "Debug: $message")
         chatListener?.onDebug(message)
     }
 
     override fun onNewMessage(messageCount: Int) {
-        Log.d(TAG, "New message: count=$messageCount")
+        if (debug) Log.d(TAG, "New message: count=$messageCount")
         chatListener?.onNewMessage(messageCount)
     }
 }

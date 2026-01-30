@@ -198,7 +198,18 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
         }
 
         webView?.visibility = View.VISIBLE
-        executeJavaScript("window.assembled?.open()")
+        // Call open and notify the bridge; if .on('open') doesn't fire,
+        // this ensures onChatOpened is still triggered
+        executeJavaScript("""
+            (function() {
+                if (window.assembled && typeof window.assembled.open === 'function') {
+                    window.assembled.open();
+                }
+                if (window.$BRIDGE_NAME) {
+                    window.$BRIDGE_NAME.onOpen();
+                }
+            })()
+        """.trimIndent())
 
         if (configuration.debug) {
             Log.d(TAG, "Chat opened")
@@ -215,7 +226,18 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
         }
 
         webView?.visibility = View.GONE
-        executeJavaScript("window.assembled?.close()")
+        // Call close and notify the bridge; if .on('close') doesn't fire,
+        // this ensures onChatClosed is still triggered
+        executeJavaScript("""
+            (function() {
+                if (window.assembled && typeof window.assembled.close === 'function') {
+                    window.assembled.close();
+                }
+                if (window.$BRIDGE_NAME) {
+                    window.$BRIDGE_NAME.onClose();
+                }
+            })()
+        """.trimIndent())
 
         if (configuration.debug) {
             Log.d(TAG, "Chat closed")
@@ -325,76 +347,161 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                 ></script>
                 <script>
                     (function() {
+                        var DEBUG = ${configuration.debug};
                         var maxAttempts = 50;
                         var attemptInterval = 200;
                         var attempts = 0;
                         var disableLauncher = ${configuration.disableLauncher};
-                        
+
+                        function log(msg) { if (DEBUG) console.log('[AssembledChat] ' + msg); }
+                        function logError(msg) { console.error('[AssembledChat] ' + msg); }
+
                         function setupBridge() {
                             attempts++;
-                            
+
                             if (typeof window.assembled !== 'undefined') {
-                                console.log('Assembled chat SDK found after ' + attempts + ' attempt(s)');
-                                
-                                // Configure disableLauncher if needed
+                                log('SDK ready after ' + attempts + ' attempt(s)');
+
                                 if (disableLauncher && typeof window.assembled.setConfig === 'function') {
                                     window.assembled.setConfig({ disableLauncher: true });
-                                    console.log('disableLauncher configured');
                                 }
-                                
-                                // Set user data if provided
+
                                 var userData = $userDataJs;
                                 if (userData) {
                                     window.assembled.setUserData(userData);
-                                    console.log('User data set');
                                 }
-                                
-                                // Authenticate user with JWT token if provided
+
                                 var jwtToken = $jwtTokenJs;
                                 if (jwtToken) {
                                     window.assembled.authenticateUser(jwtToken);
-                                    console.log('JWT token set via authenticateUser');
                                 }
-                                
-                                // Setup bridge callbacks
+
                                 if (window.$BRIDGE_NAME) {
-                                    console.log('Setting up Android bridge callbacks');
-                                    
-                                    // Notify ready
-                                    window.$BRIDGE_NAME.onReady();
-                                    
-                                    // Listen for events if the SDK supports them
+                                    // Listen for events via SDK .on() method
                                     if (typeof window.assembled.on === 'function') {
                                         window.assembled.on('open', function() {
-                                            console.log('Chat opened event');
+                                            log('Event: open');
                                             window.$BRIDGE_NAME.onOpen();
                                         });
                                         window.assembled.on('close', function() {
-                                            console.log('Chat closed event');
+                                            log('Event: close');
                                             window.$BRIDGE_NAME.onClose();
                                         });
                                         window.assembled.on('error', function(error) {
-                                            console.log('Chat error event:', error);
+                                            log('Event: error');
                                             window.$BRIDGE_NAME.onError(JSON.stringify(error));
                                         });
                                         window.assembled.on('message', function(data) {
-                                            console.log('New message event');
+                                            log('Event: message');
                                             window.$BRIDGE_NAME.onNewMessage(1);
                                         });
                                     }
+
+                                    // Fallback: listen for postMessage events
+                                    window.addEventListener('message', function(event) {
+                                        try {
+                                            var data = event.data;
+                                            if (typeof data === 'string') {
+                                                try { data = JSON.parse(data); } catch(e) { return; }
+                                            }
+                                            if (!data || typeof data !== 'object') return;
+
+                                            var type = data.type || data.event || data.action;
+                                            if (!type) return;
+
+                                            var typeStr = String(type).toLowerCase();
+                                            if (typeStr.indexOf('assembled') === -1 && typeStr.indexOf('chat') === -1) return;
+
+                                            log('postMessage: ' + typeStr);
+
+                                            if (typeStr.indexOf('open') !== -1) {
+                                                window.$BRIDGE_NAME.onOpen();
+                                            } else if (typeStr.indexOf('close') !== -1) {
+                                                window.$BRIDGE_NAME.onClose();
+                                            } else if (typeStr.indexOf('error') !== -1) {
+                                                window.$BRIDGE_NAME.onError(JSON.stringify(data.error || data.message || data));
+                                            } else if (typeStr.indexOf('message') !== -1 || typeStr.indexOf('new_message') !== -1) {
+                                                window.$BRIDGE_NAME.onNewMessage(data.count || 1);
+                                            }
+                                        } catch(e) {
+                                            log('postMessage error: ' + e.message);
+                                        }
+                                    });
+
+                                    // MutationObserver fallback: detect chat close via DOM changes
+                                    (function() {
+                                        var chatContainer = null;
+                                        var lastOpenState = null;
+
+                                        function findChatContainer() {
+                                            var selectors = [
+                                                '[data-assembled-chat]',
+                                                '[class*="assembled"]',
+                                                '#assembled-chat',
+                                                'iframe[src*="assembled"]',
+                                                '[class*="chat-widget"]',
+                                                '[class*="chat-container"]'
+                                            ];
+                                            for (var i = 0; i < selectors.length; i++) {
+                                                var el = document.querySelector(selectors[i]);
+                                                if (el) return el;
+                                            }
+                                            return null;
+                                        }
+
+                                        function checkChatState() {
+                                            if (!chatContainer) chatContainer = findChatContainer();
+
+                                            var isOpen = false;
+                                            if (chatContainer) {
+                                                var style = window.getComputedStyle(chatContainer);
+                                                isOpen = style.display !== 'none' &&
+                                                         style.visibility !== 'hidden' &&
+                                                         style.opacity !== '0';
+                                            }
+
+                                            if (window.assembled && typeof window.assembled.isOpen === 'function') {
+                                                isOpen = window.assembled.isOpen();
+                                            } else if (window.assembled && typeof window.assembled.isOpen === 'boolean') {
+                                                isOpen = window.assembled.isOpen;
+                                            }
+
+                                            if (lastOpenState !== null && lastOpenState !== isOpen) {
+                                                log('State change detected: ' + (isOpen ? 'open' : 'close'));
+                                                if (isOpen) {
+                                                    window.$BRIDGE_NAME.onOpen();
+                                                } else {
+                                                    window.$BRIDGE_NAME.onClose();
+                                                }
+                                            }
+                                            lastOpenState = isOpen;
+                                        }
+
+                                        if (typeof MutationObserver !== 'undefined') {
+                                            var observer = new MutationObserver(checkChatState);
+                                            observer.observe(document.body, {
+                                                childList: true,
+                                                subtree: true,
+                                                attributes: true,
+                                                attributeFilter: ['style', 'class', 'hidden']
+                                            });
+                                        }
+                                        setInterval(checkChatState, 500);
+                                    })();
+
+                                    window.$BRIDGE_NAME.onReady();
                                 }
                             } else if (attempts < maxAttempts) {
-                                console.log('Waiting for assembled SDK... attempt ' + attempts + '/' + maxAttempts);
+                                log('Waiting for SDK... attempt ' + attempts + '/' + maxAttempts);
                                 setTimeout(setupBridge, attemptInterval);
                             } else {
-                                console.error('Assembled chat SDK not found after ' + maxAttempts + ' attempts');
+                                logError('SDK not found after ' + maxAttempts + ' attempts');
                                 if (window.$BRIDGE_NAME) {
                                     window.$BRIDGE_NAME.onError('Assembled chat SDK not found - timeout');
                                 }
                             }
                         }
-                        
-                        // Start checking after a brief delay to let the script load
+
                         setTimeout(setupBridge, 100);
                     })();
                 </script>

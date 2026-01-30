@@ -19,6 +19,10 @@ internal class MessageBridge(
         private const val TAG = "AssembledChat"
     }
 
+    // Track open/close state to avoid duplicate events from multiple event sources
+    @Volatile
+    private var isOpen = false
+
     /**
      * Called from JavaScript when the chat widget is ready.
      */
@@ -33,6 +37,11 @@ internal class MessageBridge(
      */
     @JavascriptInterface
     fun onOpen() {
+        if (isOpen) {
+            logDebug("Bridge: onOpen called but already open, skipping duplicate")
+            return
+        }
+        isOpen = true
         logDebug("Bridge: onOpen called from JavaScript")
         listener?.onChatOpened()
     }
@@ -42,6 +51,11 @@ internal class MessageBridge(
      */
     @JavascriptInterface
     fun onClose() {
+        if (!isOpen) {
+            logDebug("Bridge: onClose called but already closed, skipping duplicate")
+            return
+        }
+        isOpen = false
         logDebug("Bridge: onClose called from JavaScript")
         listener?.onChatClosed()
     }

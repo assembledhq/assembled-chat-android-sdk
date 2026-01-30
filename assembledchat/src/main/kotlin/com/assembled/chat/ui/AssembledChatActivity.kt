@@ -3,6 +3,8 @@ package com.assembled.chat.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.MenuItem
 import android.widget.FrameLayout
@@ -85,6 +87,9 @@ class AssembledChatActivity : AppCompatActivity(), AssembledChatListener {
 
     private lateinit var chat: AssembledChat
     private lateinit var container: FrameLayout
+    private var disableLauncher = false
+    private var debug = false
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -104,6 +109,8 @@ class AssembledChatActivity : AppCompatActivity(), AssembledChatListener {
 
         // Parse configuration from intent
         val configuration = parseConfiguration()
+        disableLauncher = configuration.disableLauncher
+        debug = configuration.debug
 
         // Initialize chat
         chat = AssembledChat(configuration)
@@ -115,8 +122,10 @@ class AssembledChatActivity : AppCompatActivity(), AssembledChatListener {
             container.addView(webView)
         }
 
-        // Auto-open chat
-        chat.open()
+        // Auto-open chat (skip if disableLauncher — will open in onChatReady)
+        if (!disableLauncher) {
+            chat.open()
+        }
     }
 
     override fun onDestroy() {
@@ -160,24 +169,32 @@ class AssembledChatActivity : AppCompatActivity(), AssembledChatListener {
 
     // AssembledChatListener implementation
     override fun onChatReady() {
-        Log.d(TAG, "Chat ready")
+        if (debug) Log.d(TAG, "Chat ready")
+
+        // Auto-open chat when disableLauncher is true
+        // Must post to main thread since this callback runs on JavaBridge thread
+        if (disableLauncher) {
+            mainHandler.post {
+                chat.open()
+            }
+        }
     }
 
     override fun onChatOpened() {
-        Log.d(TAG, "Chat opened")
+        if (debug) Log.d(TAG, "Chat opened")
     }
 
     override fun onChatClosed() {
-        Log.d(TAG, "Chat closed")
+        if (debug) Log.d(TAG, "Chat closed")
         finish()
     }
 
     override fun onError(error: ChatError) {
-        Log.e(TAG, "Chat error: $error")
+        if (debug) Log.e(TAG, "Chat error: $error")
     }
 
     override fun onDebug(message: String) {
-        Log.d(TAG, "Debug: $message")
+        if (debug) Log.d(TAG, "Debug: $message")
     }
 }
 

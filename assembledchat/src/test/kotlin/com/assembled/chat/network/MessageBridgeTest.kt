@@ -79,9 +79,11 @@ class MessageBridgeTest {
     @Test
     fun `onClose should call listener onChatClosed`() {
         val bridge = MessageBridge(testListener, debug = false)
-        
+
+        bridge.onOpen() // Must open first since close deduplicates by state
+        closeCalled = false // Reset after open
         bridge.onClose()
-        
+
         assertTrue(closeCalled, "onChatClosed should be called")
     }
 
@@ -141,9 +143,11 @@ class MessageBridgeTest {
     @Test
     fun `postMessage with close type should call onClose`() {
         val bridge = MessageBridge(testListener, debug = false)
-        
+
+        bridge.postMessage("open", "") // Must open first since close deduplicates by state
+        closeCalled = false
         bridge.postMessage("close", "")
-        
+
         assertTrue(closeCalled, "onChatClosed should be called for 'close' message type")
     }
 
@@ -198,11 +202,11 @@ class MessageBridgeTest {
     @Test
     fun `bridge with debug disabled should still call listener methods`() {
         val bridge = MessageBridge(testListener, debug = false)
-        
+
         bridge.onReady()
         bridge.onOpen()
-        bridge.onClose()
-        
+        bridge.onClose() // Close after open, so state tracking allows it
+
         assertTrue(readyCalled, "onChatReady should be called even with debug=false")
         assertTrue(openCalled, "onChatOpened should be called even with debug=false")
         assertTrue(closeCalled, "onChatClosed should be called even with debug=false")
@@ -211,12 +215,62 @@ class MessageBridgeTest {
     @Test
     fun `bridge with debug enabled should call listener methods`() {
         val bridge = MessageBridge(testListener, debug = true)
-        
+
         bridge.onReady()
         bridge.onDebug("test")
-        
+
         assertTrue(readyCalled, "onChatReady should be called with debug=true")
         assertTrue(debugCalled, "onDebug should be called with debug=true")
+    }
+
+    @Test
+    fun `duplicate onOpen calls should be deduplicated`() {
+        var openCount = 0
+        val countingListener = object : AssembledChatListener {
+            override fun onChatOpened() { openCount++ }
+        }
+        val bridge = MessageBridge(countingListener, debug = false)
+
+        bridge.onOpen()
+        bridge.onOpen()
+        bridge.onOpen()
+
+        assertEquals(1, openCount, "onChatOpened should only be called once for duplicate opens")
+    }
+
+    @Test
+    fun `duplicate onClose calls should be deduplicated`() {
+        var closeCount = 0
+        val countingListener = object : AssembledChatListener {
+            override fun onChatClosed() { closeCount++ }
+        }
+        val bridge = MessageBridge(countingListener, debug = false)
+
+        bridge.onOpen() // Must open first
+        bridge.onClose()
+        bridge.onClose()
+        bridge.onClose()
+
+        assertEquals(1, closeCount, "onChatClosed should only be called once for duplicate closes")
+    }
+
+    @Test
+    fun `open and close cycle should work correctly`() {
+        var openCount = 0
+        var closeCount = 0
+        val countingListener = object : AssembledChatListener {
+            override fun onChatOpened() { openCount++ }
+            override fun onChatClosed() { closeCount++ }
+        }
+        val bridge = MessageBridge(countingListener, debug = false)
+
+        bridge.onOpen()
+        bridge.onClose()
+        bridge.onOpen()
+        bridge.onClose()
+
+        assertEquals(2, openCount, "onChatOpened should be called twice for two open/close cycles")
+        assertEquals(2, closeCount, "onChatClosed should be called twice for two open/close cycles")
     }
 }
 

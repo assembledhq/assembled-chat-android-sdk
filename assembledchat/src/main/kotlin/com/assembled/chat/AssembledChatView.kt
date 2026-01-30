@@ -1,6 +1,8 @@
 package com.assembled.chat
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import android.widget.FrameLayout
 import com.assembled.chat.models.AssembledChatConfiguration
@@ -31,6 +33,8 @@ class AssembledChatView @JvmOverloads constructor(
 ) : FrameLayout(context, attrs, defStyleAttr), AssembledChatListener {
 
     private var chat: AssembledChat? = null
+    private var disableLauncher = false
+    private val mainHandler = Handler(Looper.getMainLooper())
     var listener: AssembledChatListener? = null
 
     /**
@@ -41,12 +45,13 @@ class AssembledChatView @JvmOverloads constructor(
     fun initialize(configuration: AssembledChatConfiguration) {
         // Clean up existing chat if any
         chat?.destroy()
+        disableLauncher = configuration.disableLauncher
 
         // Create new chat instance
         chat = AssembledChat(configuration).apply {
             this.listener = this@AssembledChatView
             initialize(context)
-            
+
             // Add WebView to this view
             getWebView()?.let { webView ->
                 removeAllViews()
@@ -97,6 +102,14 @@ class AssembledChatView @JvmOverloads constructor(
     // AssembledChatListener implementation - forward to external listener
     override fun onChatReady() {
         listener?.onChatReady()
+
+        // Auto-open chat when disableLauncher is true
+        // Must post to main thread since this callback runs on JavaBridge thread
+        if (disableLauncher) {
+            mainHandler.post {
+                chat?.open()
+            }
+        }
     }
 
     override fun onChatOpened() {

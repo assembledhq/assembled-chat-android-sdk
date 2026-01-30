@@ -3,6 +3,8 @@ package com.assembled.chat.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.MenuItem
 import android.widget.FrameLayout
@@ -85,6 +87,8 @@ class AssembledChatActivity : AppCompatActivity(), AssembledChatListener {
 
     private lateinit var chat: AssembledChat
     private lateinit var container: FrameLayout
+    private var disableLauncher = false
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -104,6 +108,7 @@ class AssembledChatActivity : AppCompatActivity(), AssembledChatListener {
 
         // Parse configuration from intent
         val configuration = parseConfiguration()
+        disableLauncher = configuration.disableLauncher
 
         // Initialize chat
         chat = AssembledChat(configuration)
@@ -115,8 +120,10 @@ class AssembledChatActivity : AppCompatActivity(), AssembledChatListener {
             container.addView(webView)
         }
 
-        // Auto-open chat
-        chat.open()
+        // Auto-open chat (skip if disableLauncher — will open in onChatReady)
+        if (!disableLauncher) {
+            chat.open()
+        }
     }
 
     override fun onDestroy() {
@@ -161,6 +168,14 @@ class AssembledChatActivity : AppCompatActivity(), AssembledChatListener {
     // AssembledChatListener implementation
     override fun onChatReady() {
         Log.d(TAG, "Chat ready")
+
+        // Auto-open chat when disableLauncher is true
+        // Must post to main thread since this callback runs on JavaBridge thread
+        if (disableLauncher) {
+            mainHandler.post {
+                chat.open()
+            }
+        }
     }
 
     override fun onChatOpened() {

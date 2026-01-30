@@ -198,7 +198,18 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
         }
 
         webView?.visibility = View.VISIBLE
-        executeJavaScript("window.assembled?.open()")
+        // Call open and notify the bridge; if .on('open') doesn't fire,
+        // this ensures onChatOpened is still triggered
+        executeJavaScript("""
+            (function() {
+                if (window.assembled && typeof window.assembled.open === 'function') {
+                    window.assembled.open();
+                }
+                if (window.$BRIDGE_NAME) {
+                    window.$BRIDGE_NAME.onOpen();
+                }
+            })()
+        """.trimIndent())
 
         if (configuration.debug) {
             Log.d(TAG, "Chat opened")
@@ -215,7 +226,18 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
         }
 
         webView?.visibility = View.GONE
-        executeJavaScript("window.assembled?.close()")
+        // Call close and notify the bridge; if .on('close') doesn't fire,
+        // this ensures onChatClosed is still triggered
+        executeJavaScript("""
+            (function() {
+                if (window.assembled && typeof window.assembled.close === 'function') {
+                    window.assembled.close();
+                }
+                if (window.$BRIDGE_NAME) {
+                    window.$BRIDGE_NAME.onClose();
+                }
+            })()
+        """.trimIndent())
 
         if (configuration.debug) {
             Log.d(TAG, "Chat closed")
@@ -359,12 +381,10 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                                 // Setup bridge callbacks
                                 if (window.$BRIDGE_NAME) {
                                     console.log('Setting up Android bridge callbacks');
-                                    
-                                    // Notify ready
-                                    window.$BRIDGE_NAME.onReady();
-                                    
-                                    // Listen for events if the SDK supports them
+
+                                    // Listen for events via SDK .on() method
                                     if (typeof window.assembled.on === 'function') {
+                                        console.log('Using window.assembled.on() for event listening');
                                         window.assembled.on('open', function() {
                                             console.log('Chat opened event');
                                             window.$BRIDGE_NAME.onOpen();
@@ -381,7 +401,124 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                                             console.log('New message event');
                                             window.$BRIDGE_NAME.onNewMessage(1);
                                         });
+                                    } else {
+                                        console.log('window.assembled.on() not available, using postMessage listener');
                                     }
+
+                                    // Also listen for postMessage events as a fallback/complement
+                                    // Many chat SDKs communicate via window.postMessage
+                                    window.addEventListener('message', function(event) {
+                                        try {
+                                            var data = event.data;
+                                            if (typeof data === 'string') {
+                                                try { data = JSON.parse(data); } catch(e) { return; }
+                                            }
+                                            if (!data || typeof data !== 'object') return;
+
+                                            // Handle Assembled SDK events sent via postMessage
+                                            var type = data.type || data.event || data.action;
+                                            if (!type) return;
+
+                                            var typeStr = String(type).toLowerCase();
+                                            if (typeStr.indexOf('assembled') === -1 && typeStr.indexOf('chat') === -1) return;
+
+                                            console.log('postMessage event: ' + JSON.stringify(data));
+
+                                            if (typeStr.indexOf('open') !== -1) {
+                                                window.$BRIDGE_NAME.onOpen();
+                                            } else if (typeStr.indexOf('close') !== -1) {
+                                                window.$BRIDGE_NAME.onClose();
+                                            } else if (typeStr.indexOf('error') !== -1) {
+                                                window.$BRIDGE_NAME.onError(JSON.stringify(data.error || data.message || data));
+                                            } else if (typeStr.indexOf('message') !== -1 || typeStr.indexOf('new_message') !== -1) {
+                                                window.$BRIDGE_NAME.onNewMessage(data.count || 1);
+                                            } else if (typeStr.indexOf('ready') !== -1) {
+                                                // Already handled, but log it
+                                                console.log('postMessage ready event (already notified)');
+                                            }
+                                        } catch(e) {
+                                            console.log('Error processing postMessage: ' + e.message);
+                                        }
+                                    });
+
+                                    // MutationObserver fallback: detect chat close by watching for DOM/style changes
+                                    // This catches the X button tap when .on('close') doesn't fire
+                                    (function() {
+                                        var chatContainer = null;
+                                        var lastOpenState = null;
+
+                                        function findChatContainer() {
+                                            // Look for common chat widget container patterns
+                                            var selectors = [
+                                                '[data-assembled-chat]',
+                                                '[class*="assembled"]',
+                                                '#assembled-chat',
+                                                'iframe[src*="assembled"]',
+                                                '[class*="chat-widget"]',
+                                                '[class*="chat-container"]'
+                                            ];
+                                            for (var i = 0; i < selectors.length; i++) {
+                                                var el = document.querySelector(selectors[i]);
+                                                if (el) return el;
+                                            }
+                                            return null;
+                                        }
+
+                                        function checkChatState() {
+                                            if (!chatContainer) {
+                                                chatContainer = findChatContainer();
+                                            }
+
+                                            // Check if chat is visually open
+                                            var isOpen = false;
+                                            if (chatContainer) {
+                                                var style = window.getComputedStyle(chatContainer);
+                                                isOpen = style.display !== 'none' &&
+                                                         style.visibility !== 'hidden' &&
+                                                         style.opacity !== '0';
+                                            }
+
+                                            // Also check window.assembled.isOpen if available
+                                            if (window.assembled && typeof window.assembled.isOpen === 'function') {
+                                                isOpen = window.assembled.isOpen();
+                                            } else if (window.assembled && typeof window.assembled.isOpen === 'boolean') {
+                                                isOpen = window.assembled.isOpen;
+                                            }
+
+                                            // Detect state changes
+                                            if (lastOpenState !== null && lastOpenState !== isOpen) {
+                                                if (isOpen) {
+                                                    console.log('MutationObserver detected chat opened');
+                                                    window.$BRIDGE_NAME.onOpen();
+                                                } else {
+                                                    console.log('MutationObserver detected chat closed');
+                                                    window.$BRIDGE_NAME.onClose();
+                                                }
+                                            }
+                                            lastOpenState = isOpen;
+                                        }
+
+                                        // Set up MutationObserver to watch for DOM changes
+                                        if (typeof MutationObserver !== 'undefined') {
+                                            var observer = new MutationObserver(function(mutations) {
+                                                checkChatState();
+                                            });
+
+                                            observer.observe(document.body, {
+                                                childList: true,
+                                                subtree: true,
+                                                attributes: true,
+                                                attributeFilter: ['style', 'class', 'hidden']
+                                            });
+                                            console.log('MutationObserver set up for chat state detection');
+                                        }
+
+                                        // Also poll periodically as ultimate fallback
+                                        setInterval(checkChatState, 500);
+                                    })();
+
+                                    // Notify ready after all listeners are set up
+                                    window.$BRIDGE_NAME.onReady();
                                 }
                             } else if (attempts < maxAttempts) {
                                 console.log('Waiting for assembled SDK... attempt ' + attempts + '/' + maxAttempts);

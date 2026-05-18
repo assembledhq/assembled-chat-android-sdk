@@ -259,7 +259,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
         }
 
         val userDataJs = userData
-            .withCountryFallback(countryFallback ?: "US")
+            .withCountryFallback(countryFallback!!)
             .toJavaScript()
         executeJavaScript("window.assembled?.setUserData($userDataJs)")
 
@@ -323,7 +323,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
     }
 
     private fun buildChatHtml(): String {
-        val country = countryFallback ?: "US"
+        val country = countryFallback!!
         val userDataJs = configuration.userData?.withCountryFallback(country)?.toJavaScript() ?: "null"
         val jwtTokenJs = configuration.jwtToken?.let { "'${it.replace("'", "\\'")}'" } ?: "null"
         val profileIdAttr = configuration.profileId?.let { "data-profile-id=\"$it\"" } ?: ""

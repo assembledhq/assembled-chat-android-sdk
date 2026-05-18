@@ -10,9 +10,7 @@ internal object CountryResolver {
     fun resolve(context: Context): String {
         val locale = primaryLocale(context)
         val localeCountry = locale.country.normalizeCountry()
-        if (localeCountry != null) return localeCountry
-
-        return likelyCountryFor(locale) ?: DEFAULT_COUNTRY
+        return localeCountry ?: DEFAULT_COUNTRY
     }
 
     @Suppress("DEPRECATION")
@@ -22,36 +20,6 @@ internal object CountryResolver {
             configuration.locales[0] ?: Locale.getDefault()
         } else {
             configuration.locale ?: Locale.getDefault()
-        }
-    }
-
-    internal fun likelyCountryFor(locale: Locale): String? {
-        return when (locale.language.lowercase(Locale.US)) {
-            "ar" -> "SA"
-            "da" -> "DK"
-            "de" -> "DE"
-            "en" -> "US"
-            "es" -> "ES"
-            "fi" -> "FI"
-            "fr" -> "FR"
-            "hi" -> "IN"
-            "id" -> "ID"
-            "it" -> "IT"
-            "ja" -> "JP"
-            "ko" -> "KR"
-            "ms" -> "MY"
-            "nb", "no" -> "NO"
-            "nl" -> "NL"
-            "pl" -> "PL"
-            "pt" -> "BR"
-            "ru" -> "RU"
-            "sv" -> "SE"
-            "th" -> "TH"
-            "tr" -> "TR"
-            "uk" -> "UA"
-            "vi" -> "VN"
-            "zh" -> if (locale.script.equals("Hant", ignoreCase = true)) "TW" else "CN"
-            else -> null
         }
     }
 

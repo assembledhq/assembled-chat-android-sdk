@@ -82,4 +82,54 @@ class UserDataTest {
 
         assertFalse(js.contains("metadata:"))
     }
+
+    @Test
+    fun `withCountryFallback adds country to metadata when missing`() {
+        val userData = UserData(userId = "user-123")
+
+        val withFallback = userData.withCountryFallback("US")
+
+        assertContains(withFallback.toJavaScript(), "metadata: {")
+        assertContains(withFallback.toJavaScript(), "'country': 'US'")
+    }
+
+    @Test
+    fun `withCountryFallback adds country to existing metadata when country is missing`() {
+        val userData = UserData(
+            userId = "user-123",
+            metadata = mapOf("plan" to "premium")
+        )
+
+        val withFallback = userData.withCountryFallback("US")
+
+        assertContains(withFallback.toJavaScript(), "'country': 'US'")
+        assertContains(withFallback.toJavaScript(), "'plan': 'premium'")
+    }
+
+    @Test
+    fun `withCountryFallback preserves existing metadata country`() {
+        val userData = UserData(
+            userId = "user-123",
+            metadata = mapOf("country" to "CA", "plan" to "premium")
+        )
+
+        val withFallback = userData.withCountryFallback("US")
+
+        assertContains(withFallback.toJavaScript(), "'country': 'CA'")
+        assertContains(withFallback.toJavaScript(), "'plan': 'premium'")
+    }
+
+    @Test
+    fun `withCountryFallback preserves blank metadata country`() {
+        val userData = UserData(
+            userId = "user-123",
+            metadata = mapOf("country" to "", "plan" to "premium")
+        )
+
+        val withFallback = userData.withCountryFallback("US")
+
+        assertContains(withFallback.toJavaScript(), "'country': ''")
+        assertFalse(withFallback.toJavaScript().contains("'country': 'US'"))
+        assertContains(withFallback.toJavaScript(), "'plan': 'premium'")
+    }
 }

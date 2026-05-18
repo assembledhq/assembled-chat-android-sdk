@@ -12,6 +12,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.assembled.chat.internal.CountryResolver
 import com.assembled.chat.models.AssembledChatConfiguration
 import com.assembled.chat.models.ChatError
 import com.assembled.chat.models.UserData
@@ -44,6 +45,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
 
     private var webView: WebView? = null
     private var messageBridge: MessageBridge? = null
+    private var countryFallback: String? = null
     private var isInitialized = false
     private var isInitializing = false
 
@@ -163,6 +165,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
             }
 
             // Load HTML page with embedded chat widget script
+            countryFallback = CountryResolver.resolve(context)
             val chatHtml = buildChatHtml()
             if (configuration.debug) {
                 Log.d(TAG, "Loading chat widget HTML")
@@ -255,7 +258,9 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
             return
         }
 
-        val userDataJs = userData.toJavaScript()
+        val userDataJs = userData
+            .withCountryFallback(countryFallback ?: "US")
+            .toJavaScript()
         executeJavaScript("window.assembled?.setUserData($userDataJs)")
 
         if (configuration.debug) {
@@ -312,12 +317,14 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
         }
         webView = null
         messageBridge = null
+        countryFallback = null
         isInitialized = false
         isInitializing = false
     }
 
     private fun buildChatHtml(): String {
-        val userDataJs = configuration.userData?.toJavaScript() ?: "null"
+        val country = countryFallback ?: "US"
+        val userDataJs = configuration.userData?.withCountryFallback(country)?.toJavaScript() ?: "null"
         val jwtTokenJs = configuration.jwtToken?.let { "'${it.replace("'", "\\'")}'" } ?: "null"
         val profileIdAttr = configuration.profileId?.let { "data-profile-id=\"$it\"" } ?: ""
         val disableLauncherAttr = if (configuration.disableLauncher) "data-disable-launcher=\"true\"" else ""
@@ -541,4 +548,3 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
         }
     }
 }
-

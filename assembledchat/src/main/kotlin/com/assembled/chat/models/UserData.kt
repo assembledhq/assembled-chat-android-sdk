@@ -42,6 +42,11 @@ data class UserData(
         return "{ ${parts.joinToString(", ")} }"
     }
 
+    internal fun withCountryFallback(country: String): UserData {
+        if (metadata?.containsKey("country") == true) return this
+
+        return copy(metadata = metadata.orEmpty() + ("country" to country))
+    }
+
     private fun String.escapeForJs(): String = this.replace("'", "\\'")
 }
-

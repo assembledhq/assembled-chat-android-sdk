@@ -324,7 +324,10 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
 
     private fun buildChatHtml(): String {
         val country = countryFallback!!
-        val userDataJs = configuration.userData?.withCountryFallback(country)?.toJavaScript() ?: "null"
+        val userDataJs = configuration.userData
+            ?.withCountryFallback(country)
+            ?.toJavaScript()
+            ?: UserData.countryOnlyJavaScript(country)
         val jwtTokenJs = configuration.jwtToken?.let { "'${it.replace("'", "\\'")}'" } ?: "null"
         val profileIdAttr = configuration.profileId?.let { "data-profile-id=\"$it\"" } ?: ""
         val disableLauncherAttr = if (configuration.disableLauncher) "data-disable-launcher=\"true\"" else ""
@@ -375,6 +378,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
 
                                 var userData = $userDataJs;
                                 if (userData) {
+                                    log('Calling setUserData with: ' + JSON.stringify(userData));
                                     window.assembled.setUserData(userData);
                                 }
 

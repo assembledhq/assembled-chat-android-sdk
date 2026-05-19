@@ -120,6 +120,23 @@ class UserDataTest {
     }
 
     @Test
+    fun `countryOnlyJavaScript emits metadata-only payload`() {
+        val js = UserData.countryOnlyJavaScript("US")
+
+        assertContains(js, "metadata: {")
+        assertContains(js, "'country': 'US'")
+        assertFalse(js.contains("userId"))
+        assertFalse(js.contains("email"))
+    }
+
+    @Test
+    fun `countryOnlyJavaScript escapes single quotes in country`() {
+        val js = UserData.countryOnlyJavaScript("U'S")
+
+        assertContains(js, "'country': 'U\\'S'")
+    }
+
+    @Test
     fun `withCountryFallback preserves blank metadata country`() {
         val userData = UserData(
             userId = "user-123",

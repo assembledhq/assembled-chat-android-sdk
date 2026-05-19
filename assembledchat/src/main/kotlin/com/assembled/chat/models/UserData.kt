@@ -49,4 +49,16 @@ data class UserData(
     }
 
     private fun String.escapeForJs(): String = this.replace("'", "\\'")
+
+    internal companion object {
+        /**
+         * Builds a metadata-only JS payload for callers that haven't supplied a
+         * [UserData], so the web widget still receives the device-region country
+         * even without explicit user data or a JWT.
+         */
+        internal fun countryOnlyJavaScript(country: String): String {
+            val escaped = country.replace("'", "\\'")
+            return "{ metadata: { 'country': '$escaped' } }"
+        }
+    }
 }

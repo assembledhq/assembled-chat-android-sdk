@@ -362,9 +362,27 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                         var attemptInterval = 200;
                         var attempts = 0;
                         var disableLauncher = ${configuration.disableLauncher};
+                        var jwtToken = $jwtTokenJs;
+                        var userData = $userDataJs;
 
                         function log(msg) { if (DEBUG) console.log('[AssembledChat] ' + msg); }
                         function logError(msg) { console.error('[AssembledChat] ' + msg); }
+
+                        // Once the chat iframe reports loaded, post the resolved userData
+                        // and JWT to it after a brief delay so the payload lands after the
+                        // widget's initial state has settled.
+                        function postInitialUserData(event) {
+                            if (!event.data || event.data.type !== 'ASSEMBLED_LOADED') return;
+                            window.removeEventListener('message', postInitialUserData);
+                            setTimeout(function() {
+                                var iframe = document.querySelector('iframe[src*="public_chat.html"]');
+                                if (!iframe || !iframe.contentWindow) return;
+                                var payload = { type: 'USER_DATA_UPDATE', userData: userData };
+                                if (jwtToken) payload.jwtToken = jwtToken;
+                                iframe.contentWindow.postMessage(payload, 'https://cal.assembledhq.com');
+                            }, 1500);
+                        }
+                        window.addEventListener('message', postInitialUserData);
 
                         function setupBridge() {
                             attempts++;
@@ -376,32 +394,13 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                                     window.assembled.setConfig({ disableLauncher: true });
                                 }
 
-                                var jwtToken = $jwtTokenJs;
                                 if (jwtToken) {
                                     window.assembled.authenticateUser(jwtToken);
                                 }
 
-                                var userData = $userDataJs;
                                 if (userData) {
                                     window.assembled.setUserData(userData);
                                 }
-
-                                // Once the chat iframe has loaded, post a USER_DATA_UPDATE
-                                // directly to its contentWindow with just jwtToken + userData.
-                                // Runs once per page load.
-                                window.addEventListener('message', function(event) {
-                                    var d = event.data;
-                                    if (d && d.type === 'ASSEMBLED_LOADED' && !window.__assembledUserDataSent) {
-                                        window.__assembledUserDataSent = true;
-                                        setTimeout(function() {
-                                            var iframe = document.querySelector('iframe[src*="public_chat.html"]');
-                                            if (!iframe || !iframe.contentWindow) return;
-                                            var payload = { type: 'USER_DATA_UPDATE', userData: userData };
-                                            if (jwtToken) payload.jwtToken = jwtToken;
-                                            iframe.contentWindow.postMessage(payload, 'https://cal.assembledhq.com');
-                                        }, 1500);
-                                    }
-                                });
 
                                 if (window.$BRIDGE_NAME) {
                                     // Listen for events via SDK .on() method

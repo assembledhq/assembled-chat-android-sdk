@@ -376,15 +376,32 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                                     window.assembled.setConfig({ disableLauncher: true });
                                 }
 
+                                var jwtToken = $jwtTokenJs;
+                                if (jwtToken) {
+                                    window.assembled.authenticateUser(jwtToken);
+                                }
+
                                 var userData = $userDataJs;
                                 if (userData) {
                                     window.assembled.setUserData(userData);
                                 }
 
-                                var jwtToken = $jwtTokenJs;
-                                if (jwtToken) {
-                                    window.assembled.authenticateUser(jwtToken);
-                                }
+                                // Once the chat iframe has loaded, post a USER_DATA_UPDATE
+                                // directly to its contentWindow with just jwtToken + userData.
+                                // Runs once per page load.
+                                window.addEventListener('message', function(event) {
+                                    var d = event.data;
+                                    if (d && d.type === 'ASSEMBLED_LOADED' && !window.__assembledUserDataSent) {
+                                        window.__assembledUserDataSent = true;
+                                        setTimeout(function() {
+                                            var iframe = document.querySelector('iframe[src*="public_chat.html"]');
+                                            if (!iframe || !iframe.contentWindow) return;
+                                            var payload = { type: 'USER_DATA_UPDATE', userData: userData };
+                                            if (jwtToken) payload.jwtToken = jwtToken;
+                                            iframe.contentWindow.postMessage(payload, 'https://cal.assembledhq.com');
+                                        }, 1500);
+                                    }
+                                });
 
                                 if (window.$BRIDGE_NAME) {
                                     // Listen for events via SDK .on() method

@@ -199,7 +199,7 @@ fun AssembledChatComposable(
 
     AndroidView(
         modifier = modifier,
-        factory = { ctx ->
+        factory = { _ ->
             chat.getWebView() ?: WebView(activityContext).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,

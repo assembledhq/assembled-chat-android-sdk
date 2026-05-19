@@ -378,7 +378,6 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
 
                                 var userData = $userDataJs;
                                 if (userData) {
-                                    log('Calling setUserData with: ' + JSON.stringify(userData));
                                     window.assembled.setUserData(userData);
                                 }
 

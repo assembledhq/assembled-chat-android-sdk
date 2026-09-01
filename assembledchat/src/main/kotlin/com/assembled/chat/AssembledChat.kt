@@ -1,7 +1,10 @@
 package com.assembled.chat
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.util.Log
 import android.view.View
@@ -17,6 +20,8 @@ import com.assembled.chat.models.AssembledChatConfiguration
 import com.assembled.chat.models.ChatError
 import com.assembled.chat.models.UserData
 import com.assembled.chat.network.MessageBridge
+import java.net.URI
+import java.net.URISyntaxException
 
 /**
  * Main SDK class for Assembled Chat integration.
@@ -101,6 +106,24 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                     if (configuration.debug) {
                         Log.d(TAG, "URL Loading: ${request?.url}")
                     }
+
+                    val url = request?.url ?: return false
+                    if (shouldOpenInExternalBrowser(url.toString(), request.isForMainFrame)) {
+                        val intent = Intent(Intent.ACTION_VIEW, url)
+                        if (context !is Activity) {
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+
+                        try {
+                            context.startActivity(intent)
+                        } catch (error: ActivityNotFoundException) {
+                            listener?.onError(
+                                ChatError.Unknown("Unable to open external link: ${error.message}")
+                            )
+                        }
+                        return true
+                    }
+
                     return false
                 }
 
@@ -550,4 +573,18 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
             }
         }
     }
+}
+
+internal fun shouldOpenInExternalBrowser(url: String?, isForMainFrame: Boolean): Boolean {
+    if (!isForMainFrame || url.isNullOrBlank()) {
+        return false
+    }
+
+    val scheme = try {
+        URI(url).scheme?.lowercase()
+    } catch (_: URISyntaxException) {
+        null
+    }
+
+    return scheme == "http" || scheme == "https"
 }

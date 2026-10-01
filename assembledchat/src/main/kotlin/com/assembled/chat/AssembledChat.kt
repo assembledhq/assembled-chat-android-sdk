@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import android.view.View
@@ -108,23 +109,20 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                     }
 
                     val url = request?.url ?: return false
-                    if (shouldOpenInExternalBrowser(url.toString(), request.isForMainFrame)) {
-                        val intent = Intent(Intent.ACTION_VIEW, url)
-                        if (context !is Activity) {
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
+                    return openExternallyIfNeeded(context, url, request.isForMainFrame)
+                }
 
-                        try {
-                            context.startActivity(intent)
-                        } catch (error: ActivityNotFoundException) {
-                            listener?.onError(
-                                ChatError.Unknown("Unable to open external link: ${error.message}")
-                            )
-                        }
-                        return true
+                // Android 6.0 and below only invoke this overload.
+                @Deprecated("Deprecated in Java")
+                override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                    if (configuration.debug) {
+                        Log.d(TAG, "URL Loading: $url")
                     }
 
-                    return false
+                    if (url.isNullOrBlank()) {
+                        return false
+                    }
+                    return openExternallyIfNeeded(context, Uri.parse(url), isForMainFrame = true)
                 }
 
                 override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
@@ -564,6 +562,26 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
             executeJavaScript(debugScript)
             Log.d(TAG, "Configuration check executed")
         }
+    }
+
+    private fun openExternallyIfNeeded(context: Context, url: Uri, isForMainFrame: Boolean): Boolean {
+        if (!shouldOpenInExternalBrowser(url.toString(), isForMainFrame)) {
+            return false
+        }
+
+        val intent = Intent(Intent.ACTION_VIEW, url)
+        if (context !is Activity) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        try {
+            context.startActivity(intent)
+        } catch (error: ActivityNotFoundException) {
+            listener?.onError(
+                ChatError.Unknown("Unable to open external link: ${error.message}")
+            )
+        }
+        return true
     }
 
     private fun executeJavaScript(script: String) {

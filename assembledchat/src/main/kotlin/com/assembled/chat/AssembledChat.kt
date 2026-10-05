@@ -350,14 +350,14 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
             Log.d(TAG, "Destroying chat instance")
         }
 
+        fileChooser?.dispose()
+        fileChooser = null
         webView?.apply {
             stopLoading()
             removeJavascriptInterface(BRIDGE_NAME)
             destroy()
         }
         webView = null
-        fileChooser?.dispose()
-        fileChooser = null
         messageBridge = null
         countryFallback = null
         isInitialized = false

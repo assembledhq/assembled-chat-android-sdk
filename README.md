@@ -238,6 +238,12 @@ The SDK is built with modern Android development practices:
 - The SDK requires WebView 51.0 or higher
 - Update Android System WebView from Google Play Store if needed
 
+### File attachments
+
+Tapping **+** in the chat composer opens the system file picker (photos and PDFs). This works out of the box when `AssembledChat` is initialized with an Activity that extends `ComponentActivity` (including `AppCompatActivity` and `FragmentActivity`); the built-in Activity, Fragment, View, and Compose integrations already do this. No extra permissions are needed.
+
+If you set your own `WebChromeClient` on the WebView from `getWebView()`, it replaces the SDK's client, including the file picker.
+
 ### ProGuard/R8
 
 The SDK is fully compatible with code obfuscation. Consumer ProGuard rules are automatically applied.

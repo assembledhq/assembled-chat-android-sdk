@@ -10,6 +10,7 @@ import android.os.Build
 import android.util.Log
 import android.view.View
 import android.webkit.ConsoleMessage
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -17,6 +18,8 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.assembled.chat.internal.CountryResolver
+import com.assembled.chat.internal.FileChooser
+import com.assembled.chat.internal.findComponentActivity
 import com.assembled.chat.models.AssembledChatConfiguration
 import com.assembled.chat.models.ChatError
 import com.assembled.chat.models.UserData
@@ -52,6 +55,7 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
     private var webView: WebView? = null
     private var messageBridge: MessageBridge? = null
     private var countryFallback: String? = null
+    private var fileChooser: FileChooser? = null
     private var isInitialized = false
     private var isInitializing = false
 
@@ -170,18 +174,33 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
                 }
             }
 
-            // Setup WebChromeClient for console logs (in debug mode)
-            if (configuration.debug) {
-                webView?.webChromeClient = object : WebChromeClient() {
-                    override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                        consoleMessage?.let {
-                            Log.d(
-                                TAG,
-                                "WebView Console [${it.messageLevel()}]: ${it.message()} (${it.sourceId()}:${it.lineNumber()})"
-                            )
-                        }
-                        return true
+            webView?.webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                    if (!configuration.debug) {
+                        return super.onConsoleMessage(consoleMessage)
                     }
+                    consoleMessage?.let {
+                        Log.d(
+                            TAG,
+                            "WebView Console [${it.messageLevel()}]: ${it.message()} (${it.sourceId()}:${it.lineNumber()})"
+                        )
+                    }
+                    return true
+                }
+
+                override fun onShowFileChooser(
+                    webView: WebView?,
+                    filePathCallback: ValueCallback<Array<Uri>>?,
+                    fileChooserParams: FileChooserParams?
+                ): Boolean {
+                    val callback = filePathCallback ?: return false
+                    val chooser = fileChooser ?: context.findComponentActivity()?.let(::FileChooser)
+                    if (chooser == null) {
+                        Log.w(TAG, "File attachments need AssembledChat to be initialized with a ComponentActivity context")
+                        return false
+                    }
+                    fileChooser = chooser
+                    return chooser.show(callback, fileChooserParams)
                 }
             }
 
@@ -337,6 +356,8 @@ class AssembledChat(private val configuration: AssembledChatConfiguration) {
             destroy()
         }
         webView = null
+        fileChooser?.dispose()
+        fileChooser = null
         messageBridge = null
         countryFallback = null
         isInitialized = false
